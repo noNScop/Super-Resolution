@@ -18,11 +18,9 @@ psnr = PeakSignalNoiseRatio(data_range=1.0).to(device)
 ssim = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
 lpips = LearnedPerceptualImagePatchSimilarity(normalize=True).to(device)
 
-DIV2K_RGB = torch.tensor([0.44882884613943946, 0.43713809810624193, 0.4040371984052683], device='cpu')
-
 transform = v2.Compose([
     v2.PILToTensor(),
-    v2.Lambda(lambda x: (x / 255.0) - DIV2K_RGB[:, None, None])
+    v2.Lambda(lambda x: x / 255.0)
 ])
 
 class ResBlockEDSRLight(nn.Module):
@@ -44,6 +42,8 @@ class EDSR_Light(nn.Module):
             n: scaling factor
         """
         super().__init__()
+        self.DIV2K_RGB = torch.tensor([0.44882884613943946, 0.43713809810624193, 0.4040371984052683]).to(device)
+        
         self.expand = nn.Sequential(
             nn.Conv2d(3, 64, 9, stride=1, padding='same'),
             nn.PReLU()
@@ -64,19 +64,18 @@ class EDSR_Light(nn.Module):
         self.upscaling_head.append(nn.Conv2d(64, 3, 9, stride=1, padding='same'))
 
     def forward(self, x):
-        x = self.expand(x)
-        return self.upscaling_head(self.residual_blocks(x) + x)
+        x = self.expand(x-self.DIV2K_RGB[:, None, None])
+        return self.upscaling_head(self.residual_blocks(x) + x) + self.DIV2K_RGB[:, None, None]
     
 class EDSR_Dataset(Dataset):
     def __init__(self, target_paths: list[str], scale: int, ram_limit_gb: float = 2.0):
         self.crop_size = scale * 48
         self.scale = scale
-        self.DIV2K_RGB = torch.tensor([0.44882884613943946, 0.43713809810624193, 0.4040371984052683], device='cpu')
 
         self.rotations = [0, 90, 180, 270]
         self.transforms = v2.Compose([
             v2.PILToTensor(),
-            v2.Lambda(lambda x: (x / 255.0) - self.DIV2K_RGB[:, None, None])
+            v2.Lambda(lambda x: (x / 255.0))
         ])
 
         self.preloaded = {}
@@ -128,7 +127,7 @@ class EDSR_Dataset(Dataset):
     def set_crop_size(self, crop_size: int):
         self.crop_size = crop_size
 
-def calc_metrics(model, target_ds: list[str], scale: int):
+def calc_metrics(model: nn.Module, target_ds: list[str], scale: int):
     transform_target = v2.Compose([
         v2.PILToTensor(),
         v2.Lambda(lambda x: x/255.0)
@@ -136,7 +135,7 @@ def calc_metrics(model, target_ds: list[str], scale: int):
 
     transform_input = v2.Compose([
         v2.PILToTensor(),
-        v2.Lambda(lambda x: (x / 255.0) - DIV2K_RGB[:, None, None])
+        v2.Lambda(lambda x: (x / 255.0))
     ])
 
     psnr_acc = 0
@@ -157,7 +156,7 @@ def calc_metrics(model, target_ds: list[str], scale: int):
         target_tensor = transform_target(target_image).unsqueeze(0).to(device)
 
         with torch.inference_mode():
-            sr = (model(input_tensor) + DIV2K_RGB[:, None, None].to(device)).clamp(0, 1)
+            sr = model(input_tensor).clamp(0, 1)
 
         psnr_acc += psnr(sr, target_tensor).item()
         ssim_acc += ssim(sr, target_tensor).item()
@@ -193,9 +192,6 @@ def train_step(model, dataloader, optimizer, loss_fn):
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
 
-        logits += DIV2K_RGB[:, None, None].to(device)
-        target += DIV2K_RGB[:, None, None].to(device)
-
         logits = logits.clamp(0.0, 1.0)
         target = target.clamp(0.0, 1.0)
         
@@ -215,9 +211,6 @@ def valid_step(model, dataloader, loss_fn):
     with torch.inference_mode():
         for batch, target in dataloader:
             batch, target = batch.to(device), target.to(device)
-            
-            logits = model(batch) + DIV2K_RGB[:, None, None].to(device)
-            target += DIV2K_RGB[:, None, None].to(device)
             
             logits = logits.clamp(0.0, 1.0)
             target = target.clamp(0.0, 1.0)
