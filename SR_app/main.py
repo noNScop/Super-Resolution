@@ -10,12 +10,6 @@ def load_model(model_name: str, scaling_factor: int, device: str):
         model.load_state_dict(checkpoint['model_state_dict'])
         return model
     
-    elif model_name == "EDSR_Light" and os.path.isfile(f"../model_checkpoints/EDSR_Light/X{scaling_factor}.pth"):
-        model = EDSR_Light(scaling_factor).to(device)
-        checkpoint = torch.load(f'../model_checkpoints/EDSR_Light/X{scaling_factor}.pth', map_location=torch.device(device))
-        model.load_state_dict(checkpoint['model_state_dict'])
-        return model
-    
     else:
         print(f"X{scaling_factor} is unavaiable for {model_name}")
         return None
@@ -46,9 +40,8 @@ def choose_model(device: str):
         print("\n===== Choose Super Resolution Architecture =====")
         print("1. Bicubic Interpolation")
         print("2. FSRCNN")
-        print("3. EDSR_Light")
 
-        choice = input("Select an option (1-3): ")
+        choice = input("Select an option (1-2): ")
         model = None
 
         if choice == "1":
@@ -57,11 +50,8 @@ def choose_model(device: str):
         elif choice == "2":
             model = choose_scale("FSRCNN", device)
 
-        elif choice == "3":
-            model = choose_scale("EDSR_Light", device)
-
         else:
-            print("Invalid option. Please choose 1-3.")
+            print("Invalid option. Please choose 1-2.")
 
         if model is not None:
             return model
