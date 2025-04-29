@@ -12,11 +12,7 @@ All experiments are conducted using the **DIV2K** dataset.
 
 3. **SRGAN** - Super-Resolution Generative Adversarial Network - Described in this [paper](https://arxiv.org/pdf/1609.04802). This model also includes **SRResNet**, which is used as the generator in **SRGAN** but was previously state-of-the-art in **PSNR**-focused super-resolution tasks
 
-4. **EDSR** - Enhanced Deep Super-Resolution Network - Based on [paper](https://arxiv.org/pdf/1707.02921), **EDSR** modifies **SRResNet** by removing **batch normalization** layers, which were found to degrade performance in super-resolution tasks. It also increases model capacity, with **~43M** parameters compared to SRResNet’s **~1.5M**.
-
-
-
-5. **RCAN** - TODO
+4. **RCAN** - TODO
 
 ## CLI Interface
 

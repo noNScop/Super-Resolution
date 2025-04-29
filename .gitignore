@@ -1,6 +1,7 @@
 SR_venv/
 data/
 tmp_model_checkpoints/
+SR_app/output/
 
 .vscode
 .DS_Store
