@@ -1,15 +1,20 @@
 import os
 import math
+import glob
 import torch
 import random
 import numpy as np
+import pandas as pd
 import torch.nn as nn
 from PIL import Image
 from tqdm.auto import tqdm
+from torch.optim import Adam
+from torchinfo import summary
 from torchvision.transforms import v2
-from torch.utils.data import Dataset
-from torchmetrics.image import PeakSignalNoiseRatio
+from torch.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import StepLR
+from torch.utils.data import Dataset, DataLoader
+from torchmetrics.image import PeakSignalNoiseRatio
 from torchmetrics.image import StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
@@ -171,20 +176,22 @@ def calc_metrics(model: nn.Module, target_ds: list[str], scale: int):
     ssim_acc /= len(target_ds)
     return psnr_acc, ssim_acc, lpips_acc
     
-def train_step(model, dataloader, optimizer, loss_fn):
+def train_step(model, dataloader, optimizer, loss_fn, scaler):
     avg_psnr = 0
     avg_ssim = 0
     model.train()
 
     for batch, target in dataloader:
-        batch, target = batch.to(device), target.to(device)
-        
-        logits = model(batch)
-        loss = loss_fn(logits, target)
-
-        loss.backward()
-        optimizer.step()
         optimizer.zero_grad(set_to_none=True)
+        batch, target = batch.to(device), target.to(device)
+
+        with autocast('cuda'):
+            logits = model(batch)
+            loss = loss_fn(logits, target)
+
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         # convert value range [-1,1] -> [0,1]
         logits = ((logits+1.0)/2.0).clamp(0.0, 1.0)
@@ -218,18 +225,21 @@ def valid_step(model, dataloader, loss_fn):
     avg_psnr /= len(dataloader)
     avg_ssim /= len(dataloader)
     avg_lpips /= len(dataloader)
- 
+
+
     return avg_psnr, avg_ssim, avg_lpips
 
-def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoint=None):
+def train(model, train_dl, valid_dl, optimizer, scheduler: StepLR, loss_fn, epochs, start_checkpoint=None):
     os.makedirs('../tmp_model_checkpoints', exist_ok=True)
     counter = 0 # count epochs without printing training stats
+    scaler = GradScaler('cuda')
     
     if start_checkpoint:
         start_epoch = start_checkpoint['epoch'] + 1
         best_psnr = start_checkpoint['best_psnr']
         best_ssim = start_checkpoint['best_ssim']
         best_lpips = start_checkpoint['best_lpips']
+        scaler.load_state_dict(start_checkpoint['scaler_state_dict'])
     else:
         start_epoch = 0
         best_psnr = 0
@@ -244,7 +254,8 @@ def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoin
             model,
             train_dl,
             optimizer,
-            loss_fn
+            loss_fn,
+            scaler
         )
 
         valid_psnr, valid_ssim, valid_lpips = valid_step(
@@ -252,6 +263,8 @@ def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoin
             valid_dl,
             loss_fn,
         )
+
+        scheduler.step()
 
         progress = False
         
@@ -263,8 +276,10 @@ def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoin
                 'best_psnr': best_psnr,
                 'best_ssim': best_ssim,
                 'best_lpips': best_lpips,
-                'model_state_dict':  model._orig_mod.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict()
+                'model_state_dict':  model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'scaler_state_dict': scaler.state_dict()
             }
             torch.save(checkpoint, f'../tmp_model_checkpoints/best_psnr.pth')
 
@@ -276,8 +291,10 @@ def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoin
                 'best_psnr': best_psnr,
                 'best_ssim': best_ssim,
                 'best_lpips': best_lpips,
-                'model_state_dict':  model._orig_mod.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict()
+                'model_state_dict':  model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'scaler_state_dict': scaler.state_dict()
             }
             torch.save(checkpoint, f'../tmp_model_checkpoints/best_ssim.pth')
 
@@ -289,8 +306,10 @@ def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoin
                 'best_psnr': best_psnr,
                 'best_ssim': best_ssim,
                 'best_lpips': best_lpips,
-                'model_state_dict':  model._orig_mod.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict()
+                'model_state_dict':  model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'scaler_state_dict': scaler.state_dict()
             }
             torch.save(checkpoint, f'../tmp_model_checkpoints/best_lpips.pth')
 
@@ -300,8 +319,10 @@ def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoin
                 'best_psnr': best_psnr,
                 'best_ssim': best_ssim,
                 'best_lpips': best_lpips,
-                'model_state_dict':  model._orig_mod.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict()
+                'model_state_dict':  model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'scaler_state_dict': scaler.state_dict()
             }
             torch.save(checkpoint, f'../tmp_model_checkpoints/last.pth')
             
@@ -309,6 +330,7 @@ def train(model, train_dl, valid_dl, optimizer, loss_fn, epochs, start_checkpoin
             counter = 0
             print(
                 f"Epoch: {epoch+1} | "
+                f"learning rate: {scheduler.get_last_lr()[0]:.7f} | "
                 f"[train] PSNR: {train_psnr:.4f} | "
                 f"[train] SSIM: {train_ssim:.4f} | "
                 f"[valid] PSNR: {valid_psnr:.4f} | "

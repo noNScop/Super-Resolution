@@ -48,7 +48,7 @@ def choose_model(device: str):
         print("2. FSRCNN")
         print("3. SRResNet")
 
-        choice = input("Select an option (1-2): ")
+        choice = input("Select an option (1-3): ")
         model = None
 
         if choice == "1":
