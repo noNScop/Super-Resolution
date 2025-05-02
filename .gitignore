@@ -2,6 +2,7 @@ SR_venv/
 data/
 tmp_model_checkpoints/
 SR_app/output/
+3_SRGAN/mid_training_images/
 
 .vscode
 .DS_Store
