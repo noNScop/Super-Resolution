@@ -358,8 +358,9 @@ def train(generator, discriminator, train_dl, valid_dl, generator_opt, discrimin
         start_epoch = 0
         
     log_freq = (epochs - start_epoch) // 100 # how often to print stats when no progress is made
-    
-    for _ in tqdm(range(100), desc="Discriminator warm up"):
+
+    # 10 epochs instead of 100, because generator has a more difficult task here
+    for _ in tqdm(range(10), desc="Discriminator warm up"):
         for batch, target in train_dl:
             batch, target = batch.to(device), target.to(device)
             train_discriminator(batch, target, generator, discriminator, discriminator_opt, dis_loss_fn)
