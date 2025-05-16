@@ -16,6 +16,12 @@ def load_model(model_name: str, scaling_factor: int, device: str):
         model.load_state_dict(checkpoint['model_state_dict'])
         return model
     
+    elif model_name == "SRGAN" and os.path.isfile(f"../model_checkpoints/SRGAN/X{scaling_factor}.pth"):
+        model = SRGAN(scaling_factor).to(device)
+        checkpoint = torch.load(f'../model_checkpoints/SRGAN/X{scaling_factor}.pth', map_location=torch.device(device))
+        model.load_state_dict(checkpoint['generator_state_dict'])
+        return model
+    
     else:
         print(f"X{scaling_factor} is unavaiable for {model_name}")
         return None
@@ -47,8 +53,9 @@ def choose_model(device: str):
         print("1. Bicubic Interpolation")
         print("2. FSRCNN")
         print("3. SRResNet")
+        print("4. SRGAN")
 
-        choice = input("Select an option (1-3): ")
+        choice = input("Select an option (1-4): ")
         model = None
 
         if choice == "1":
@@ -60,8 +67,11 @@ def choose_model(device: str):
         elif choice == "3":
             model = choose_scale("SRResNet", device)
 
+        elif choice == "4":
+            model = choose_scale("SRGAN", device)
+
         else:
-            print("Invalid option. Please choose 1-3.")
+            print("Invalid option. Please choose 1-4.")
 
         if model is not None:
             model.eval()

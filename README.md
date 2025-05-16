@@ -10,9 +10,9 @@ All experiments are conducted using the **DIV2K** dataset.
 
 2. **FSRCNN** - Fast Super-Resolution Convolutional Neural Network - An enhanced version of SRCNN described in this [paper](https://arxiv.org/pdf/1608.00367). FSRCNN achieves better performance than bicubic interpolation while being faster and more efficient.
 
-3. **SRGAN** - Super-Resolution Generative Adversarial Network - Described in this [paper](https://arxiv.org/pdf/1609.04802). This model also includes **SRResNet**, which is used as the generator in **SRGAN** but was previously state-of-the-art in **PSNR**-focused super-resolution tasks
+3. **SRGAN** - Super-Resolution Generative Adversarial Network - Described in this [paper](https://arxiv.org/pdf/1609.04802). This model also includes **SRResNet**, which is used as the generator in **SRGAN** but was previously state-of-the-art in **PSNR**-focused super-resolution tasks. Due to instabilities during training, I was only able to train **SRGAN** for **X2 scaling**.
 
-4. **RCAN** - TODO
+4. **RCAN** - Residual Channel Attention Network - A state-of-the-art deep learning model for single image super-resolution described in this [paper](https://arxiv.org/abs/1807.02758). RCAN leverages residual blocks and channel attention mechanisms to effectively enhance high-frequency details and achieve superior performance in high-scale image upscaling tasks. It demonstrates remarkable results, especially for higher scaling factors such as **X4** and **X8**.
 
 ## CLI Interface
 

@@ -134,3 +134,48 @@ class SRResNet(nn.Module):
         os.makedirs("output", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         img.save(f"output/{timestamp}_X{self.scale}.png")
+
+class SRGAN(nn.Module):
+    def __init__(self, n: int):
+        """
+        Args:
+            n: scaling factor
+        """
+        super().__init__()
+        self.name = "SRGAN"
+        self.scale = n
+
+        self.transform = v2.Compose([
+            v2.PILToTensor(),
+            v2.Lambda(lambda x: x / 255.0)
+        ])
+        
+        self.expand = nn.Sequential(
+            nn.Conv2d(3, 64, 9, stride=1, padding='same'),
+            nn.PReLU()
+        )
+
+        self.residual_blocks = nn.Sequential()
+        for _ in range(16):
+            self.residual_blocks.append(ResBlock())
+
+        self.residual_blocks.append(nn.Conv2d(64, 64, 3, stride=1, padding='same'))
+        self.residual_blocks.append(nn.BatchNorm2d(64))
+
+        self.upscaling_head = nn.Sequential()
+        for _ in range(int(math.log2(n))):
+            self.upscaling_head.append(nn.Conv2d(64, 256, 3, stride=1, padding='same'))
+            self.upscaling_head.append(nn.PixelShuffle(2))
+            self.upscaling_head.append(nn.PReLU())
+            
+        self.upscaling_head.append(nn.Conv2d(64, 3, 9, stride=1, padding='same'))
+    
+    def forward(self, image: str):
+        image = Image.open(image).convert("RGB")
+        inp = self.transform(image).to(device)
+        x = self.expand(inp[None])
+        out = (((self.upscaling_head(self.residual_blocks(x) + x)+1.0)/2.0).clamp(0.0, 1.0) * 255.0).squeeze()
+        img = Image.fromarray(out.permute(1, 2, 0).to(torch.uint8).cpu().numpy())
+        os.makedirs("output", exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        img.save(f"output/{timestamp}_X{self.scale}.png")
