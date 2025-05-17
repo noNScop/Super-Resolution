@@ -14,6 +14,8 @@ All experiments are conducted using the **DIV2K** dataset.
 
 4. **RCAN** - Residual Channel Attention Network - A state-of-the-art deep learning model for single image super-resolution described in this [paper](https://arxiv.org/abs/1807.02758). RCAN leverages residual blocks and channel attention mechanisms to effectively enhance high-frequency details and achieve superior performance in high-scale image upscaling tasks. It demonstrates remarkable results, especially for higher scaling factors such as **X4** and **X8**.
 
+5. **ESRGAN** - Enhanced Super-Resolution Generative Adversarial Network - An improved version of **SRGAN**, described in this [paper](https://arxiv.org/abs/1809.00219). ESRGAN introduces several improvements, including the **Residual-in-Residual Dense Block (RRDB)** and the use of the **Relativistic GAN** for more realistic image generation. It significantly improves perceptual quality while maintaining high fidelity and is widely used for **X4 scaling** and other challenging super-resolution tasks.
+
 ## CLI Interface
 
 This repository also includes a lightweight terminal interface that allows users to interactively:
