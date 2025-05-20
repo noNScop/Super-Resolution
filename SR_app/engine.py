@@ -20,6 +20,10 @@ class BicubicInterpolation:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         scaled_image.save(f"output/{timestamp}_X{self.scale}.png")
 
+
+
+
+
 class FSRCNN(nn.Module):
     def __init__(self, n: int, d: int = 56, s: int = 12, m: int = 4):
         """
@@ -76,6 +80,10 @@ class FSRCNN(nn.Module):
             nn.PReLU()
         )
     
+
+
+
+
 class ResBlock(nn.Module):
         def __init__(self):
             super().__init__()
@@ -135,6 +143,10 @@ class SRResNet(nn.Module):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         img.save(f"output/{timestamp}_X{self.scale}.png")
 
+
+
+
+
 class SRGAN(nn.Module):
     def __init__(self, n: int):
         """
@@ -179,3 +191,101 @@ class SRGAN(nn.Module):
         os.makedirs("output", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         img.save(f"output/{timestamp}_X{self.scale}.png")
+
+
+
+
+
+class RCAB(nn.Module):
+    """
+    Residual Channel Attention Block
+    """
+    def __init__(self):
+        super().__init__()
+
+        self.block1 = nn.Sequential(
+            nn.Conv2d(64, 64, 3, padding='same'),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, padding='same')
+        )
+
+        self.attention_block = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(64, 64//16, 1),
+            nn.ReLU(),
+            nn.Conv2d(64//16, 64, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        Xgb = self.block1(x)
+        return x + Xgb * self.attention_block(Xgb)
+    
+class RG(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.block = nn.Sequential()
+
+        for _ in range(20):
+            self.block.append(RCAB())
+
+        self.block.append(nn.Conv2d(64, 64, 3, padding='same'))
+
+    def forward(self, x):
+        return x + self.block(x)
+    
+class RIR(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.block = nn.Sequential()
+
+        for _ in range(10):
+            self.block.append(RG())
+
+        self.block.append(nn.Conv2d(64, 64, 3, padding='same'))
+
+    def forward(self, x):
+        return x + self.block(x)
+
+class RCAN(nn.Module):
+    def __init__(self, n):
+        """
+        Args:
+            n: scaling factor
+        """
+        super().__init__()
+        self.name = "RCAN"
+        self.scale = n
+
+        self.DIV2K_RGB = torch.tensor([0.44882884613943946, 0.43713809810624193, 0.4040371984052683]).view(1, 3, 1, 1).to(device)
+
+        self.transform = v2.Compose([
+            v2.PILToTensor(),
+            v2.Lambda(lambda x: x / 255.0)
+        ])
+
+        self.feature_extractor = nn.Sequential(
+            nn.Conv2d(3, 64, 3, padding='same'),
+            RIR()
+        )
+
+        self.upscaling_head = nn.Sequential()
+        for _ in range(int(math.log2(n))):
+            self.upscaling_head.append(nn.Conv2d(64, 4*64, 3, padding='same'))
+            self.upscaling_head.append(nn.PixelShuffle(2))
+            self.upscaling_head.append(nn.PReLU())
+            
+        self.upscaling_head.append(nn.Conv2d(64, 3, 3, padding='same'))
+
+    def forward(self, x):
+        image = Image.open(image).convert("RGB")
+        inp = self.transform(image).to(device)
+
+        out = ((self.upscaling_head(self.feature_extractor(inp[None]-self.DIV2K_RGB)) + self.DIV2K_RGB).clamp(0.0, 1.0) * 255.0).squeeze()
+
+        img = Image.fromarray(out.permute(1, 2, 0).to(torch.uint8).cpu().numpy())
+        os.makedirs("output", exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        img.save(f"output/{timestamp}_X{self.scale}.png")
+
+        return self.upscaling_head(self.feature_extractor(x-self.DIV2K_RGB)) + self.DIV2K_RGB
