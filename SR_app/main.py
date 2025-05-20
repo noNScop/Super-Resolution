@@ -23,7 +23,7 @@ def load_model(model_name: str, scaling_factor: int, device: str):
         return model
     
     elif model_name == "RCAN" and os.path.isfile(f"../model_checkpoints/RCAN/X{scaling_factor}.pth"):
-        model = SRGAN(scaling_factor).to(device)
+        model = RCAN(scaling_factor).to(device)
         checkpoint = torch.load(f'../model_checkpoints/RCAN/X{scaling_factor}.pth', map_location=torch.device(device))
         model.load_state_dict(checkpoint['model_state_dict'])
         return model
@@ -60,7 +60,7 @@ def choose_model(device: str):
         print("2. FSRCNN")
         print("3. SRResNet")
         print("4. SRGAN")
-        print("4. RCAN")
+        print("5. RCAN")
 
         choice = input("Select an option (1-4): ")
         model = None

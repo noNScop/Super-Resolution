@@ -278,7 +278,7 @@ class RCAN(nn.Module):
         self.upscaling_head.append(nn.Conv2d(64, 3, 3, padding='same'))
 
     def forward(self, x):
-        image = Image.open(image).convert("RGB")
+        image = Image.open(x).convert("RGB")
         inp = self.transform(image).to(device)
 
         out = ((self.upscaling_head(self.feature_extractor(inp[None]-self.DIV2K_RGB)) + self.DIV2K_RGB).clamp(0.0, 1.0) * 255.0).squeeze()
@@ -287,5 +287,3 @@ class RCAN(nn.Module):
         os.makedirs("output", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         img.save(f"output/{timestamp}_X{self.scale}.png")
-
-        return self.upscaling_head(self.feature_extractor(x-self.DIV2K_RGB)) + self.DIV2K_RGB
