@@ -8,5 +8,6 @@ SR_app/output/
 .vscode
 .DS_Store
 .ipynb_checkpoints
+ESRGAN_pretrained_X2.pth
 
 __pycache__
