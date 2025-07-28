@@ -33,9 +33,6 @@ python main.py
 
 The upscaled output image will be saved in the output folder inside the same directory.
 
-## Results
-TODO
-
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
